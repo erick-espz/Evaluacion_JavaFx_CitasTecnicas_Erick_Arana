@@ -3,6 +3,7 @@ package com.tuempresa.sistemacitasgestion.controller;
 import com.tuempresa.sistemacitasgestion.dao.ClienteDAO;
 import com.tuempresa.sistemacitasgestion.model.Cliente;
 import com.tuempresa.sistemacitasgestion.util.Alertas;
+import com.tuempresa.sistemacitasgestion.util.EjecutorBD;
 import com.tuempresa.sistemacitasgestion.util.Validador;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -13,11 +14,13 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.layout.VBox;
 
 import java.sql.SQLException;
 
 public class ClienteController {
 
+    @FXML private VBox panelPrincipal;
     @FXML private TextField txtBuscar;
     @FXML private TextField txtNombres;
     @FXML private TextField txtApellidos;
@@ -33,6 +36,8 @@ public class ClienteController {
 
     private final ClienteDAO dao = new ClienteDAO();
     private final ObservableList<Cliente> datos = FXCollections.observableArrayList();
+    private long solicitudListado;
+    private boolean operacionEnCurso;
 
     @FXML
     private void initialize() {
@@ -54,16 +59,18 @@ public class ClienteController {
 
     @FXML
     private void buscar() {
-        String texto = txtBuscar.getText();
+        String texto = txtBuscar.getText().trim();
         if (Validador.vacio(texto)) {
             cargar();
             return;
         }
-        try {
-            datos.setAll(dao.buscar(texto));
-        } catch (SQLException e) {
-            Alertas.errorSql(e);
-        }
+        long solicitud = ++solicitudListado;
+        EjecutorBD.ejecutar(() -> dao.buscar(texto),
+                clientes -> {
+                    if (solicitud == solicitudListado) {
+                        datos.setAll(clientes);
+                    }
+                }, this::mostrarError);
     }
 
     @FXML
@@ -74,21 +81,21 @@ public class ClienteController {
 
     @FXML
     private void guardar() {
+        if (operacionEnCurso) {
+            return;
+        }
         Cliente cliente = leerFormulario(0);
         if (cliente == null) {
             return;
         }
-        try {
-            dao.insertar(cliente);
-            Alertas.exito("Cliente registrado correctamente.");
-            refrescar();
-        } catch (SQLException e) {
-            Alertas.errorSql(e);
-        }
+        ejecutarGuardado(cliente, false);
     }
 
     @FXML
     private void actualizar() {
+        if (operacionEnCurso) {
+            return;
+        }
         Cliente seleccionado = tablaClientes.getSelectionModel().getSelectedItem();
         if (seleccionado == null) {
             Alertas.advertencia("Seleccione un cliente de la tabla.");
@@ -98,37 +105,44 @@ public class ClienteController {
         if (cliente == null) {
             return;
         }
-        try {
-            dao.actualizar(cliente);
-            Alertas.exito("Cliente actualizado correctamente.");
-            refrescar();
-        } catch (SQLException e) {
-            Alertas.errorSql(e);
-        }
+        ejecutarGuardado(cliente, true);
     }
 
     @FXML
     private void eliminar() {
+        if (operacionEnCurso) {
+            return;
+        }
         Cliente seleccionado = tablaClientes.getSelectionModel().getSelectedItem();
         if (seleccionado == null) {
             Alertas.advertencia("Seleccione un cliente de la tabla.");
             return;
         }
-        try {
+        if (!Alertas.confirmar("¿Eliminar al cliente " + seleccionado.getNombreCompleto() + "?")) {
+            return;
+        }
+        operacionEnCurso = true;
+        panelPrincipal.setDisable(true);
+        ++solicitudListado;
+        EjecutorBD.ejecutar(() -> {
             if (dao.tieneCitas(seleccionado.getId())) {
+                return false;
+            }
+            dao.eliminar(seleccionado.getId());
+            return true;
+        }, eliminado -> {
+            finalizarOperacion();
+            if (!eliminado) {
                 Alertas.advertencia("No se puede eliminar a " + seleccionado.getNombreCompleto()
                         + " porque tiene citas asociadas. Elimine primero sus citas.");
                 return;
             }
-            if (!Alertas.confirmar("¿Eliminar al cliente " + seleccionado.getNombreCompleto() + "?")) {
-                return;
-            }
-            dao.eliminar(seleccionado.getId());
             Alertas.exito("Cliente eliminado correctamente.");
             refrescar();
-        } catch (SQLException e) {
-            Alertas.errorSql(e);
-        }
+        }, error -> {
+            finalizarOperacion();
+            mostrarError(error);
+        });
     }
 
     @FXML
@@ -142,11 +156,13 @@ public class ClienteController {
     }
 
     private void cargar() {
-        try {
-            datos.setAll(dao.listar());
-        } catch (SQLException e) {
-            Alertas.errorSql(e);
-        }
+        long solicitud = ++solicitudListado;
+        EjecutorBD.ejecutar(dao::listar,
+                clientes -> {
+                    if (solicitud == solicitudListado) {
+                        datos.setAll(clientes);
+                    }
+                }, this::mostrarError);
     }
 
     private void refrescar() {
@@ -186,16 +202,50 @@ public class ClienteController {
             Alertas.advertencia("El correo no tiene un formato válido.");
             return null;
         }
-        try {
-            if (dao.existeCorreo(correo, id)) {
-                Alertas.advertencia("Ya existe un cliente con ese correo.");
-                return null;
-            }
-        } catch (SQLException e) {
-            Alertas.errorSql(e);
-            return null;
-        }
         return new Cliente(id, nombres.trim(), apellidos.trim(), telefono.trim(),
                 correo.trim(), chkActivo.isSelected());
+    }
+
+    private void ejecutarGuardado(Cliente cliente, boolean actualizar) {
+        operacionEnCurso = true;
+        panelPrincipal.setDisable(true);
+        ++solicitudListado;
+        EjecutorBD.ejecutar(() -> {
+            if (dao.existeCorreo(cliente.getCorreo(), cliente.getId())) {
+                return false;
+            }
+            if (actualizar) {
+                dao.actualizar(cliente);
+            } else {
+                dao.insertar(cliente);
+            }
+            return true;
+        }, guardado -> {
+            finalizarOperacion();
+            if (!guardado) {
+                Alertas.advertencia("Ya existe un cliente con ese correo.");
+                return;
+            }
+            Alertas.exito(actualizar
+                    ? "Cliente actualizado correctamente."
+                    : "Cliente registrado correctamente.");
+            refrescar();
+        }, error -> {
+            finalizarOperacion();
+            mostrarError(error);
+        });
+    }
+
+    private void finalizarOperacion() {
+        operacionEnCurso = false;
+        panelPrincipal.setDisable(false);
+    }
+
+    private void mostrarError(Throwable error) {
+        if (error instanceof SQLException sqlException) {
+            Alertas.errorSql(sqlException);
+        } else {
+            Alertas.error("Error inesperado: " + error.getMessage());
+        }
     }
 }

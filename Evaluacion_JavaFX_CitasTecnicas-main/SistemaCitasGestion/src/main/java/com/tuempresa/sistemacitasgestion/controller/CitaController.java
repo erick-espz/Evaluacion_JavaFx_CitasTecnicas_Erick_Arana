@@ -6,6 +6,7 @@ import com.tuempresa.sistemacitasgestion.dao.ClienteDAO;
 import com.tuempresa.sistemacitasgestion.model.CitaTecnica;
 import com.tuempresa.sistemacitasgestion.model.Cliente;
 import com.tuempresa.sistemacitasgestion.util.Alertas;
+import com.tuempresa.sistemacitasgestion.util.EjecutorBD;
 import com.tuempresa.sistemacitasgestion.util.ValidadorCita;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -18,6 +19,7 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.layout.VBox;
 
 
 import java.sql.SQLException;
@@ -29,10 +31,9 @@ import java.time.format.DateTimeParseException;
 
 public class CitaController {
 
-
     private static final DateTimeFormatter HORA = DateTimeFormatter.ofPattern("HH:mm");
 
-
+    @FXML private VBox panelPrincipal;
     @FXML private ComboBox<String> cmbFiltroEstado;
     @FXML private DatePicker dpFiltroFecha;
     @FXML private ComboBox<Cliente> cmbCliente;
@@ -54,6 +55,9 @@ public class CitaController {
     private final ClienteDAO clienteDao = new ClienteDAO();
     private final ObservableList<CitaTecnica> datos = FXCollections.observableArrayList();
     private boolean ignorarFiltros;
+    private boolean operacionEnCurso;
+    private long solicitudListado;
+    private long solicitudClientes;
 
 
     @FXML
@@ -88,22 +92,22 @@ public class CitaController {
 
     @FXML
     private void guardar() {
+        if (operacionEnCurso) {
+            return;
+        }
         CitaTecnica cita = leerFormulario(0);
         if (cita == null) {
             return;
         }
-        try {
-            dao.insertar(cita);
-            Alertas.exito("Cita registrada correctamente.");
-            refrescar();
-        } catch (SQLException e) {
-            Alertas.errorSql(e);
-        }
+        ejecutarGuardado(cita, false);
     }
 
 
     @FXML
     private void actualizar() {
+        if (operacionEnCurso) {
+            return;
+        }
         CitaTecnica seleccionada = tablaCitas.getSelectionModel().getSelectedItem();
         if (seleccionada == null) {
             Alertas.advertencia("Seleccione una cita de la tabla.");
@@ -113,18 +117,15 @@ public class CitaController {
         if (cita == null) {
             return;
         }
-        try {
-            dao.actualizar(cita);
-            Alertas.exito("Cita actualizada correctamente.");
-            refrescar();
-        } catch (SQLException e) {
-            Alertas.errorSql(e);
-        }
+        ejecutarGuardado(cita, true);
     }
 
 
     @FXML
     private void eliminar() {
+        if (operacionEnCurso) {
+            return;
+        }
         CitaTecnica seleccionada = tablaCitas.getSelectionModel().getSelectedItem();
         if (seleccionada == null) {
             Alertas.advertencia("Seleccione una cita de la tabla.");
@@ -134,13 +135,18 @@ public class CitaController {
                 + " del " + seleccionada.getFecha() + "?")) {
             return;
         }
-        try {
+        comenzarOperacion();
+        EjecutorBD.ejecutar(() -> {
             dao.eliminar(seleccionada.getId());
+            return null;
+        }, resultado -> {
+            finalizarOperacion();
             Alertas.exito("Cita eliminada correctamente.");
             refrescar();
-        } catch (SQLException e) {
-            Alertas.errorSql(e);
-        }
+        }, error -> {
+            finalizarOperacion();
+            mostrarError(error);
+        });
     }
 
 
@@ -171,11 +177,15 @@ public class CitaController {
         if (ignorarFiltros) {
             return;
         }
-        try {
-            datos.setAll(dao.filtrar(cmbFiltroEstado.getValue(), dpFiltroFecha.getValue()));
-        } catch (SQLException e) {
-            Alertas.errorSql(e);
-        }
+        String estado = cmbFiltroEstado.getValue();
+        LocalDate fecha = dpFiltroFecha.getValue();
+        long solicitud = ++solicitudListado;
+        EjecutorBD.ejecutar(() -> dao.filtrar(estado, fecha),
+                citas -> {
+                    if (solicitud == solicitudListado) {
+                        datos.setAll(citas);
+                    }
+                }, this::mostrarError);
     }
 
 
@@ -187,14 +197,21 @@ public class CitaController {
 
     private void cargarClientes() {
         Cliente elegido = cmbCliente.getValue();
-        try {
-            cmbCliente.getItems().setAll(clienteDao.listar());
-            if (elegido != null) {
-                elegirCliente(elegido.getId());
+        Integer idElegido = elegido == null ? null : elegido.getId();
+        cargarClientes(idElegido);
+    }
+
+    private void cargarClientes(Integer idElegido) {
+        long solicitud = ++solicitudClientes;
+        EjecutorBD.ejecutar(clienteDao::listar, clientes -> {
+            if (solicitud != solicitudClientes) {
+                return;
             }
-        } catch (SQLException e) {
-            Alertas.errorSql(e);
-        }
+            cmbCliente.getItems().setAll(clientes);
+            if (idElegido != null) {
+                elegirCliente(idElegido);
+            }
+        }, this::mostrarError);
     }
 
 
@@ -211,8 +228,7 @@ public class CitaController {
 
     private void seleccionarCliente(int id) {
         if (!elegirCliente(id)) {
-            cargarClientes();
-            elegirCliente(id);
+            cargarClientes(id);
         }
     }
 
@@ -256,16 +272,55 @@ public class CitaController {
         }
 
 
-        try {
-            if (!dao.existeCliente(cliente.getId())) {
-                Alertas.advertencia("El cliente seleccionado ya no existe.");
-                return null;
-            }
-        } catch (SQLException e) {
-            Alertas.errorSql(e);
-            return null;
-        }
         return cita;
+    }
+
+    private void ejecutarGuardado(CitaTecnica cita, boolean actualizar) {
+        comenzarOperacion();
+        EjecutorBD.ejecutar(() -> {
+            if (!dao.existeCliente(cita.getClienteId())) {
+                return false;
+            }
+            if (actualizar) {
+                dao.actualizar(cita);
+            } else {
+                dao.insertar(cita);
+            }
+            return true;
+        }, guardado -> {
+            finalizarOperacion();
+            if (!guardado) {
+                Alertas.advertencia("El cliente seleccionado ya no existe.");
+                return;
+            }
+            Alertas.exito(actualizar
+                    ? "Cita actualizada correctamente."
+                    : "Cita registrada correctamente.");
+            refrescar();
+        }, error -> {
+            finalizarOperacion();
+            mostrarError(error);
+        });
+    }
+
+    private void comenzarOperacion() {
+        operacionEnCurso = true;
+        panelPrincipal.setDisable(true);
+        ++solicitudListado;
+        ++solicitudClientes;
+    }
+
+    private void finalizarOperacion() {
+        operacionEnCurso = false;
+        panelPrincipal.setDisable(false);
+    }
+
+    private void mostrarError(Throwable error) {
+        if (error instanceof SQLException sqlException) {
+            Alertas.errorSql(sqlException);
+        } else {
+            Alertas.error("Error inesperado: " + error.getMessage());
+        }
     }
 
 

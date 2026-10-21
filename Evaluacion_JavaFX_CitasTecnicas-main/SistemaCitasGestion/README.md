@@ -22,3 +22,10 @@ Sistema de gestión de clientes y citas técnicas para la empresa **TecnoAsisten
 1. Crear contenedor de PostgreSQL (o usar servicio local):
    ```bash
    docker run --name base-postgres -e POSTGRES_PASSWORD=su_clave -p 5433:5432 -d postgres
+   ```
+
+## Ejecución
+
+Las consultas y operaciones JDBC se ejecutan en hilos de trabajo para mantener
+disponible la interfaz JavaFX mientras se comunica con PostgreSQL. Los resultados
+se aplican a los controles desde el hilo de JavaFX.

@@ -4,17 +4,24 @@
 <?import javafx.scene.control.Tab?>
 <?import javafx.scene.control.TabPane?>
 <?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
 <?import javafx.scene.layout.VBox?>
 
 <BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1">
     <top>
-        <VBox styleClass="encabezado" spacing="2">
-            <Label text="TecnoAsistencia Nicaragua" styleClass="encabezado-titulo"/>
-            <Label text="Gestión de clientes y citas técnicas" styleClass="encabezado-sub"/>
-        </VBox>
+        <HBox styleClass="encabezado" alignment="CENTER_LEFT" spacing="12">
+            <Label text="H" styleClass="marca"/>
+            <VBox spacing="2">
+                <Label text="HexTech" styleClass="encabezado-titulo"/>
+                <Label text="Gestión de servicio técnico" styleClass="encabezado-sub"/>
+            </VBox>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label text="CLIENTES  /  CITAS" styleClass="encabezado-contexto"/>
+        </HBox>
     </top>
     <center>
-        <TabPane tabClosingPolicy="UNAVAILABLE">
+        <TabPane styleClass="navegacion" tabClosingPolicy="UNAVAILABLE">
             <Tab text="Clientes">
                 <fx:include source="cliente-view.fxml"/>
             </Tab>

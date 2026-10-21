@@ -10,21 +10,30 @@
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
 
-<VBox spacing="16" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+<VBox fx:id="panelPrincipal" spacing="16" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.tuempresa.sistemacitasgestion.controller.ClienteController">
     <padding>
         <Insets top="20" right="24" bottom="20" left="24"/>
     </padding>
 
+    <VBox spacing="3">
+        <Label text="Clientes" styleClass="pagina-titulo"/>
+        <Label text="Administra la información de contacto y el estado de tus clientes."
+               styleClass="pagina-descripcion"/>
+    </VBox>
+
     <HBox spacing="10" alignment="CENTER_LEFT">
-        <TextField fx:id="txtBuscar" promptText="Buscar por nombres, apellidos o correo" HBox.hgrow="ALWAYS"/>
+        <TextField fx:id="txtBuscar" promptText="Buscar por nombre, apellido o correo"
+                   styleClass="campo-busqueda" HBox.hgrow="ALWAYS"/>
         <Button text="Buscar" styleClass="boton-primario" onAction="#buscar"/>
         <Button text="Ver todos" styleClass="boton-secundario" onAction="#verTodos"/>
     </HBox>
 
     <HBox spacing="16" VBox.vgrow="ALWAYS">
-        <VBox spacing="8" styleClass="tarjeta" prefWidth="300" minWidth="300">
-            <Label text="Datos del cliente" styleClass="seccion-titulo"/>
+        <VBox spacing="8" styleClass="tarjeta formulario" prefWidth="300" minWidth="300">
+            <Label text="Ficha del cliente" styleClass="seccion-titulo"/>
+            <Label text="Completa los datos para registrar o editar."
+                   styleClass="seccion-descripcion" wrapText="true"/>
             <Label text="Nombres" styleClass="etiqueta"/>
             <TextField fx:id="txtNombres"/>
             <Label text="Apellidos" styleClass="etiqueta"/>
@@ -48,8 +57,12 @@
             </HBox>
         </VBox>
 
-        <VBox spacing="10" styleClass="tarjeta" HBox.hgrow="ALWAYS">
-            <Label text="Listado de clientes" styleClass="seccion-titulo"/>
+        <VBox spacing="10" styleClass="tarjeta listado" HBox.hgrow="ALWAYS">
+            <VBox spacing="3">
+                <Label text="Directorio de clientes" styleClass="seccion-titulo"/>
+                <Label text="Selecciona una fila para consultar o editar su información."
+                       styleClass="seccion-descripcion"/>
+            </VBox>
             <TableView fx:id="tablaClientes" VBox.vgrow="ALWAYS">
                 <columns>
                     <TableColumn fx:id="colId" text="ID" prefWidth="50"/>

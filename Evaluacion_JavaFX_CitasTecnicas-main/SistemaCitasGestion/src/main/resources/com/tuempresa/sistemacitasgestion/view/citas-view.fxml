@@ -16,15 +16,20 @@
 
 
 <?import java.lang.String?>
-<VBox spacing="16" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
+<VBox fx:id="panelPrincipal" spacing="16" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1"
       fx:controller="com.tuempresa.sistemacitasgestion.controller.CitaController">
     <padding>
         <Insets top="20" right="24" bottom="20" left="24"/>
     </padding>
 
+    <VBox spacing="3">
+        <Label text="Citas técnicas" styleClass="pagina-titulo"/>
+        <Label text="Organiza las visitas, servicios y estados de atención."
+               styleClass="pagina-descripcion"/>
+    </VBox>
 
-    <HBox spacing="10" alignment="CENTER_LEFT">
-        <Label text="Filtrar por" styleClass="etiqueta"/>
+    <HBox spacing="10" alignment="CENTER_LEFT" styleClass="barra-filtros">
+        <Label text="FILTRAR" styleClass="filtro-titulo"/>
         <ComboBox fx:id="cmbFiltroEstado" promptText="Estado" prefWidth="180">
             <items>
                 <FXCollections fx:factory="observableArrayList">
@@ -41,8 +46,10 @@
 
 
     <HBox spacing="16" VBox.vgrow="ALWAYS">
-        <VBox spacing="6" styleClass="tarjeta" prefWidth="320" minWidth="320">
-            <Label text="Datos de la cita" styleClass="seccion-titulo"/>
+        <VBox spacing="6" styleClass="tarjeta formulario" prefWidth="320" minWidth="320">
+            <Label text="Detalle de la cita" styleClass="seccion-titulo"/>
+            <Label text="Asigna un cliente y define los datos del servicio."
+                   styleClass="seccion-descripcion" wrapText="true"/>
             <Label text="Cliente" styleClass="etiqueta"/>
             <ComboBox fx:id="cmbCliente" promptText="Seleccione un cliente" maxWidth="Infinity"/>
             <HBox spacing="8">
@@ -91,8 +98,12 @@
         </VBox>
 
 
-        <VBox spacing="10" styleClass="tarjeta" HBox.hgrow="ALWAYS">
-            <Label text="Listado de citas" styleClass="seccion-titulo"/>
+        <VBox spacing="10" styleClass="tarjeta listado" HBox.hgrow="ALWAYS">
+            <VBox spacing="3">
+                <Label text="Agenda de servicio" styleClass="seccion-titulo"/>
+                <Label text="Selecciona una cita para consultar o actualizar su estado."
+                       styleClass="seccion-descripcion"/>
+            </VBox>
             <TableView fx:id="tablaCitas" VBox.vgrow="ALWAYS">
                 <columns>
                     <TableColumn fx:id="colId" text="ID" prefWidth="50"/>
