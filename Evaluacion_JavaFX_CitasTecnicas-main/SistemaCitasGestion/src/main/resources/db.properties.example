@@ -1,0 +1,3 @@
+db.url=jdbc:postgresql://localhost:5433/gestion_citas
+db.user=postgres
+db.password=TU_CLAVE
